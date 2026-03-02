@@ -8,91 +8,503 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',sans-serif;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);min-height:100vh}
     input,button{font-family:inherit}
-    input{border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none;width:100%}
-    input:focus{border-color:#e63946}
-    label{font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:5px}
-    .fade{animation:fadeIn .2s ease}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-    ::-webkit-scrollbar{width:6px}
-    ::-webkit-scrollbar-thumb{background:#e63946;border-radius:3px}
-    .batch-card:hover{transform:translateY(-3px)!important;box-shadow:0 8px 30px rgba(230,57,70,.3)!important}
-    .nav-card:hover{transform:scale(1.03)!important}
-    @media(max-width:600px){
-      .batch-grid{grid-template-columns:1fr!important}
-      .nav-grid{grid-template-columns:1fr!important}
-      .fee-grid{grid-template-columns:repeat(3,1fr)!important}
-    }
+    .fade{animation:fadeIn .25s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1a1a2e}::-webkit-scrollbar-thumb{background:#e63946;border-radius:3px}
+    .bc:hover{transform:translateY(-3px)!important;box-shadow:0 8px 30px rgba(230,57,70,.3)!important}
+    .nc:hover{transform:scale(1.03)!important}
+    .mb:hover{transform:scale(1.05)}
+    @media(max-width:600px){.bg{grid-template-columns:1fr!important}.ng{grid-template-columns:1fr!important}.mg{grid-template-columns:repeat(3,1fr)!important}}
   </style>
 </head>
 <body>
 <div id="root" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px">
   <div style="font-size:48px">🥋</div>
   <div style="color:#e63946;font-size:20px;font-weight:700">Loading Karate Dojo...</div>
-  <div id="load-msg" style="color:#aaa;font-size:14px">Connecting to Firebase...</div>
+  <div id="load-status" style="color:#aaa;font-size:14px">Connecting to Firebase...</div>
 </div>
+
 <script>
-function loadScript(src,cb){var s=document.createElement('script');s.src=src;s.onload=cb;s.onerror=function(){document.getElementById('load-msg').textContent='❌ Firebase failed. Open via http:// not file://';};document.head.appendChild(s);}
-loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',function(){loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js',function(){startApp();});});
-function startApp(){
-firebase.initializeApp({apiKey:"AIzaSyAmC09RasLC5DX7ifI-8lMlgFwukfAGf4s",authDomain:"karate-dojo-8508d.firebaseapp.com",projectId:"karate-dojo-8508d",storageBucket:"karate-dojo-8508d.firebasestorage.app",messagingSenderId:"385023110196",appId:"1:385023110196:web:477ffd69721b99ce62ae61"});
-var db=firebase.firestore();
-function dbGet(k){return db.collection('karate').doc(k).get().then(function(s){return s.exists?s.data().value:null;}).catch(function(){return null;});}
-function dbSet(k,v){return db.collection('karate').doc(k).set({value:v}).catch(console.error);}
-function dbDel(k){return db.collection('karate').doc(k).delete().catch(console.error);}
-var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-var S={view:'home',batches:[],currentBatch:null,loading:true,syncStatus:'synced',lastSync:null,modal:null,delTarget:null,bf:{name:'',timing:'',days:[],place:''},sf:{name:'',mobile:''},attendDate:new Date().toISOString().slice(0,10),attendance:{},savedAttendance:{},attendSaved:false,fees:{}};
-function set(p){Object.assign(S,p);render();}
-function cloud(k,v){set({syncStatus:'syncing'});return dbSet(k,v).then(function(){set({syncStatus:'synced',lastSync:new Date()});});}
-function boot(){dbGet('batches').then(function(d){set({batches:d||[],loading:false,lastSync:new Date()});});setInterval(function(){dbGet('batches').then(function(d){if(!d)return;if(JSON.stringify(S.batches)!==JSON.stringify(d)){var cb=S.currentBatch?(d.find(function(b){return b.id===S.currentBatch.id;})||S.currentBatch):null;set({batches:d,currentBatch:cb,lastSync:new Date(),syncStatus:'synced'});}else set({lastSync:new Date(),syncStatus:'synced'});}).catch(function(){set({syncStatus:'error'});});},15000);}
-function loadBatchData(batch){return Promise.all([dbGet('att_'+batch.id),dbGet('fee_'+batch.id)]).then(function(r){var a=r[0]||{},f=r[1]||{},ex=a[S.attendDate],ai={};(batch.students||[]).forEach(function(s){ai[s.id]='present';});set({savedAttendance:a,fees:f,attendance:ex||ai,attendSaved:!!ex});});}
-function addBatch(){var f=S.bf;if(!f.name.trim()){toast('Batch name required!');return;}var b={id:Date.now().toString(),name:f.name,timing:f.timing,days:f.days.slice(),place:f.place,students:[]},u=S.batches.concat([b]);set({batches:u,modal:null,bf:{name:'',timing:'',days:[],place:''}});cloud('batches',u);}
-function delBatch(id){var u=S.batches.filter(function(b){return b.id!==id;}),wc=S.currentBatch&&S.currentBatch.id===id;set({batches:u,modal:null,delTarget:null});if(wc)set({view:'home',currentBatch:null});cloud('batches',u);dbDel('att_'+id);dbDel('fee_'+id);}
-function addStudent(){var f=S.sf;if(!f.name.trim()){toast('Name required!');return;}if(!f.mobile.trim()){toast('Mobile required!');return;}var s={id:Date.now().toString(),name:f.name,mobile:f.mobile},ub=Object.assign({},S.currentBatch,{students:(S.currentBatch.students||[]).concat([s])});syncBatch(ub);set({modal:null,sf:{name:'',mobile:''}});}
-function delStudent(sid){syncBatch(Object.assign({},S.currentBatch,{students:S.currentBatch.students.filter(function(s){return s.id!==sid;})}));set({modal:null,delTarget:null});}
-function syncBatch(u){var bs=S.batches.map(function(b){return b.id===u.id?u:b;});set({currentBatch:u,batches:bs});cloud('batches',bs);}
-function saveAttendance(){var u=Object.assign({},S.savedAttendance);u[S.attendDate]=Object.assign({},S.attendance);set({savedAttendance:u,attendSaved:true});cloud('att_'+S.currentBatch.id,u);toast('Attendance saved! ✅');}
-function toggleFee(sid,mi){var k=sid+'_'+mi,u=Object.assign({},S.fees);u[k]=!u[k];set({fees:u});cloud('fee_'+S.currentBatch.id,u);}
-function toggleDay(day){S.bf.days=S.bf.days.indexOf(day)>=0?S.bf.days.filter(function(d){return d!==day;}):S.bf.days.concat([day]);render();}
-function loadDate(date){var ex=S.savedAttendance[date],ai={};((S.currentBatch&&S.currentBatch.students)||[]).forEach(function(s){ai[s.id]='present';});set({attendDate:date,attendance:ex||ai,attendSaved:!!ex});}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function bdg(t,c){return '<span style="background:'+(c||'#e63946')+';color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;display:inline-block">'+t+'</span>';}
-function vHome(){var ls=S.lastSync?'Last sync: '+S.lastSync.toLocaleTimeString():'';var si=S.syncStatus==='synced'?'☁️':S.syncStatus==='syncing'?'🔄':'⚠️';var sl=S.syncStatus==='synced'?'Cloud Synced':S.syncStatus==='syncing'?'Saving...':'Sync Error';var cards=S.batches.length===0?'<div style="background:rgba(255,255,255,.06);border-radius:16px;padding:60px 20px;text-align:center;border:1px solid rgba(255,255,255,.1)"><div style="font-size:56px;margin-bottom:12px">🥋</div><p style="color:#aaa;font-size:16px;margin-bottom:16px">No batches yet!</p><button onclick="A.openModal(\'addBatch\')" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:15px;font-weight:700;cursor:pointer">＋ Create Batch</button></div>':'<div class="batch-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">'+S.batches.map(function(b){return'<div class="batch-card" onclick="A.goBatch(\''+b.id+'\')" style="background:rgba(255,255,255,.07);border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,.1);cursor:pointer;transition:transform .2s,box-shadow .2s"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px"><div><div style="color:#fff;font-weight:700;font-size:18px">'+esc(b.name)+'</div><div style="color:#e63946;font-size:13px;margin-top:2px">'+esc(b.timing)+'</div></div><button onclick="event.stopPropagation();A.askDel(\'batch\',\''+b.id+'\')" style="background:rgba(230,57,70,.15);border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:15px">🗑</button></div><div style="color:#bbb;font-size:13px">📍 '+esc(b.place||'—')+'</div><div style="color:#bbb;font-size:13px;margin-top:4px">📅 '+esc((b.days||[]).join(', ')||'—')+'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">'+bdg((b.students?b.students.length:0)+' Students','#0f3460')+'<span style="color:#e63946;font-size:13px;font-weight:600">Open →</span></div></div>';}).join('')+'</div>';return'<div style="background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.3);border-radius:12px;padding:12px 18px;margin-bottom:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span>'+si+'</span><div style="flex:1;min-width:180px"><div style="color:#7dd3fc;font-weight:700;font-size:14px">Firebase Cloud — Shared live data</div><div style="color:#94a3b8;font-size:12px">Anyone on this URL sees the same data. Auto-syncs every 15s.</div></div><div style="color:#64748b;font-size:11px">'+ls+'</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px"><div><h2 style="color:#fff;margin:0;font-size:26px">Training Batches</h2><p style="color:#aaa;margin:4px 0 0">'+S.batches.length+' active batch'+(S.batches.length!==1?'es':'')+'</p></div><button onclick="A.openModal(\'addBatch\')" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:15px;font-weight:700;cursor:pointer">＋ Add Batch</button></div>'+cards;}
-function vBatch(){var b=S.currentBatch;return'<div style="margin-bottom:24px"><h2 style="color:#fff;margin:0;font-size:24px">'+esc(b.name)+'</h2><div style="color:#aaa;font-size:14px;margin-top:6px">⏰ '+esc(b.timing||'—')+' | 📍 '+esc(b.place||'—')+' | 📅 '+esc((b.days||[]).join(', ')||'—')+'</div></div><div class="nav-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">'+[{l:'Students',i:'👥',s:(b.students?b.students.length:0)+' enrolled',v:'students',c:'#0f3460'},{l:'Attendance',i:'📋',s:'Mark & track',v:'attendance',c:'#2d6a4f'},{l:'Fees',i:'💰',s:'Monthly tracking',v:'fees',c:'#7b2d8b'}].map(function(item){return'<div class="nav-card" onclick="A.goView(\''+item.v+'\')" style="background:linear-gradient(135deg,'+item.c+',rgba(255,255,255,.05));border-radius:16px;padding:28px;cursor:pointer;border:1px solid rgba(255,255,255,.12);text-align:center;transition:transform .2s"><div style="font-size:38px">'+item.i+'</div><div style="color:#fff;font-weight:700;font-size:18px;margin-top:10px">'+item.l+'</div><div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px">'+item.s+'</div></div>';}).join('')+'</div>';}
-function vStudents(){var b=S.currentBatch,rows=(!b.students||b.students.length===0)?'<div style="background:#fff;border-radius:16px;padding:50px 20px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)"><div style="font-size:44px">🥋</div><p style="color:#888;margin-top:12px">No students yet. Add your first!</p></div>':b.students.map(function(s,i){return'<div class="fade" style="background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"><div style="display:flex;align-items:center;gap:14px"><div style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">'+(i+1)+'</div><div><div style="font-weight:700;font-size:16px;color:#1a1a2e">'+esc(s.name)+'</div><div style="color:#888;font-size:13px;margin-top:2px">📱 '+esc(s.mobile)+'</div></div></div><button onclick="A.askDel(\'student\',\''+s.id+'\')" style="background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer">🗑 Remove</button></div>';}).join('');return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px"><h2 style="color:#fff;margin:0">👥 Students — '+esc(b.name)+'</h2><button onclick="A.openModal(\'addStudent\')" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:15px;font-weight:700;cursor:pointer">＋ Add Student</button></div><div style="display:flex;flex-direction:column;gap:10px">'+rows+'</div>';}
-function vAttendance(){var b=S.currentBatch,students=b.students||[],noS=students.length===0,pc=0,ac=0;students.forEach(function(s){if(S.attendance[s.id]==='absent')ac++;else pc++;});var rows=noS?'<p style="color:#888;text-align:center;padding:30px">No students in this batch.</p>':students.map(function(s){var st=S.attendance[s.id]||'present';return'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:10px;background:'+(st==='present'?'rgba(45,106,79,.08)':'rgba(230,57,70,.06)')+';border:1.5px solid '+(st==='present'?'#2d6a4f':'#e63946')+';flex-wrap:wrap;gap:8px;margin-bottom:8px"><span style="font-weight:600;color:#1a1a2e;font-size:15px">'+esc(s.name)+'</span><div style="display:flex;gap:8px"><button onclick="A.markAttend(\''+s.id+'\',\'present\')" style="padding:7px 16px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;background:'+(st==='present'?'#2d6a4f':'#eee')+';color:'+(st==='present'?'#fff':'#555')+'">✅ Present</button><button onclick="A.markAttend(\''+s.id+'\',\'absent\')" style="padding:7px 16px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;background:'+(st==='absent'?'#e63946':'#eee')+';color:'+(st==='absent'?'#fff':'#555')+'">❌ Absent</button></div></div>';}).join('');var rk=Object.keys(S.savedAttendance).sort(function(a,b){return b.localeCompare(a);});var recs=rk.length===0?'':'<div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:24px;margin-top:20px"><h3 style="margin:0 0 16px;color:#1a1a2e">📅 Past Records</h3><div style="display:flex;flex-direction:column;gap:8px">'+rk.map(function(dt){var rec=S.savedAttendance[dt],pr=Object.keys(rec).filter(function(k){return rec[k]==='present';}).length,ab=Object.keys(rec).filter(function(k){return rec[k]==='absent';}).length;return'<div onclick="A.loadDate(\''+dt+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-radius:8px;background:#f8f9fa;cursor:pointer;border:1px solid #e9ecef;flex-wrap:wrap;gap:8px"><span style="font-weight:600;color:#1a1a2e">'+dt+'</span><div style="display:flex;gap:8px">'+bdg(pr+' Present','#2d6a4f')+bdg(ab+' Absent','#e63946')+'</div></div>';}).join('')+'</div></div>';return'<h2 style="color:#fff;margin:0 0 20px">📋 Attendance — '+esc(b.name)+'</h2><div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:24px"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-bottom:18px"><div style="flex:1;min-width:180px"><label>Select Date</label><input type="date" id="att-date" value="'+S.attendDate+'" onchange="A.loadDate(this.value)" style="width:100%"/></div>'+(S.attendSaved?'<div>'+bdg('✓ Saved','#2d6a4f')+'</div>':'')+(noS?'':'<div style="display:flex;gap:8px">'+bdg(pc+' Present','#2d6a4f')+bdg(ac+' Absent','#e63946')+'</div>')+'</div>'+(noS?'':'<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button onclick="A.markAll(\'present\')" style="background:#f1f1f1;color:#333;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer">✅ Mark All Present</button><button onclick="A.markAll(\'absent\')" style="background:#f1f1f1;color:#333;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer">❌ Mark All Absent</button></div>')+'<div>'+rows+'</div>'+(noS?'':'<button onclick="A.saveAttendance()" style="margin-top:16px;width:100%;padding:13px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer">💾 Save Attendance for '+S.attendDate+'</button>')+'</div>'+recs;}
-function vFees(){var b=S.currentBatch,students=b.students||[];if(students.length===0)return'<h2 style="color:#fff;margin:0 0 20px">💰 Fees — '+esc(b.name)+'</h2><div style="background:#fff;border-radius:16px;padding:50px 20px;text-align:center"><p style="color:#888">No students yet.</p></div>';return'<h2 style="color:#fff;margin:0 0 20px">💰 Fees — '+esc(b.name)+'</h2><div style="display:flex;flex-direction:column;gap:20px">'+students.map(function(s){var pc=MONTHS.filter(function(m,i){return S.fees[s.id+'_'+i];}).length,bc=pc===12?'#2d6a4f':pc>0?'#e07c00':'#e63946';return'<div class="fade" style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:22px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px"><div><div style="font-weight:700;font-size:17px;color:#1a1a2e">'+esc(s.name)+'</div><div style="color:#888;font-size:13px;margin-top:2px">📱 '+esc(s.mobile)+'</div></div>'+bdg(pc+'/12 Paid',bc)+'</div><div class="fee-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">'+MONTHS.map(function(m,i){var paid=!!S.fees[s.id+'_'+i];return'<button onclick="A.toggleFee(\''+s.id+'\','+i+')" style="padding:10px 4px;border-radius:8px;border:2px solid '+(paid?'#2d6a4f':'#dee2e6')+';background:'+(paid?'#d4edda':'#f8f9fa')+';cursor:pointer;font-weight:700;font-size:13px;color:'+(paid?'#2d6a4f':'#aaa')+';display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s"><span>'+(paid?'✅':'⬜')+'</span><span>'+m+'</span></button>';}).join('')+'</div></div>';}).join('')+'</div>';}
-function mkModal(title,body){return'<div id="modal-overlay" onclick="if(event.target.id===\'modal-overlay\')A.closeModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px"><div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:460px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px"><h3 style="margin:0;font-size:20px;color:#1a1a2e">'+title+'</h3><button onclick="A.closeModal()" style="background:none;border:none;cursor:pointer;font-size:28px;color:#aaa;line-height:1">×</button></div>'+body+'</div></div>';}
-function mAddBatch(){var f=S.bf;return mkModal('🥋 Add New Batch','<div style="display:flex;flex-direction:column;gap:16px"><div><label>Batch Name *</label><input id="bf-name" placeholder="e.g. Morning Beginners" value="'+esc(f.name)+'" oninput="A.bfName(this.value)"/></div><div><label>Timing</label><input id="bf-timing" placeholder="e.g. 7:00 AM – 8:00 AM" value="'+esc(f.timing)+'" oninput="A.bfTiming(this.value)"/></div><div><label>Place</label><input id="bf-place" placeholder="e.g. Main Dojo Hall" value="'+esc(f.place)+'" oninput="A.bfPlace(this.value)"/></div><div><label>Training Days</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">'+DAYS.map(function(d){var sel=f.days.indexOf(d)>=0;return'<button onclick="A.toggleDay(\''+d+'\')" style="padding:7px 16px;border-radius:20px;border:2px solid '+(sel?'#e63946':'#ddd')+';background:'+(sel?'rgba(230,57,70,.1)':'#fff')+';cursor:pointer;font-weight:600;font-size:13px;color:'+(sel?'#e63946':'#888')+'">'+d+'</button>';}).join('')+'</div></div><div style="display:flex;gap:10px;margin-top:4px"><button onclick="A.submitBatch()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;font-size:15px">Create Batch</button><button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:#f1f1f1;color:#555;font-size:15px">Cancel</button></div></div>');}
-function mAddStudent(){var f=S.sf;return mkModal('👤 Add Student','<div style="display:flex;flex-direction:column;gap:16px"><div><label>Full Name *</label><input id="sf-name" placeholder="Student name" value="'+esc(f.name)+'" oninput="A.sfName(this.value)"/></div><div><label>Mobile Number *</label><input id="sf-mobile" placeholder="10-digit number" value="'+esc(f.mobile)+'" oninput="A.sfMobile(this.value)"/></div><div style="display:flex;gap:10px;margin-top:4px"><button onclick="A.submitStudent()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;font-size:15px">Add Student</button><button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:#f1f1f1;color:#555;font-size:15px">Cancel</button></div></div>');}
-function mDelBatch(){var b=S.delTarget;return mkModal('⚠️ Delete Batch','<p style="color:#555;margin-bottom:22px;font-size:15px;line-height:1.5">Delete <strong>'+esc(b.name)+'</strong>? All students, attendance and fee records will be removed.</p><div style="display:flex;gap:10px"><button onclick="A.confirmDel(\'batch\',\''+b.id+'\')" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;font-size:15px">Yes, Delete</button><button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:#f1f1f1;color:#555;font-size:15px">Cancel</button></div>');}
-function mDelStudent(){var s=S.delTarget;return mkModal('⚠️ Remove Student','<p style="color:#555;margin-bottom:22px;font-size:15px">Remove <strong>'+esc(s.name)+'</strong> from this batch?</p><div style="display:flex;gap:10px"><button onclick="A.confirmDel(\'student\',\''+s.id+'\')" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;font-size:15px">Yes, Remove</button><button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:12px;background:#f1f1f1;color:#555;font-size:15px">Cancel</button></div>');}
-function render(){var root=document.getElementById('root');if(!root)return;if(S.loading){root.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:24px;color:#e63946">Loading... 🥋</div>';return;}var isHome=S.view==='home',backFn=S.view==='batch'?'A.goHome()':"A.goView('batch')",content='';if(S.view==='home')content=vHome();else if(S.view==='batch')content=vBatch();else if(S.view==='students')content=vStudents();else if(S.view==='attendance')content=vAttendance();else if(S.view==='fees')content=vFees();var modal='';if(S.modal==='addBatch')modal=mAddBatch();else if(S.modal==='addStudent')modal=mAddStudent();else if(S.modal==='delBatch')modal=mDelBatch();else if(S.modal==='delStudent')modal=mDelStudent();root.innerHTML='<header style="background:rgba(0,0,0,.4);backdrop-filter:blur(12px);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:100"><div style="display:flex;align-items:center;gap:12px">'+(!isHome?'<button onclick="'+backFn+'" style="background:none;border:none;cursor:pointer;color:#e63946;font-size:24px;padding:2px 6px;line-height:1">←</button>':'')+'<span style="font-size:28px">🥋</span><div><div style="color:#fff;font-weight:800;font-size:20px;letter-spacing:1px">KARATE DOJO</div><div style="color:#e63946;font-size:11px;font-weight:600;letter-spacing:2px">MANAGEMENT SYSTEM</div></div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+(!isHome&&S.currentBatch?bdg(esc(S.currentBatch.name)):'')+'</div></header><main class="fade" style="max-width:960px;margin:0 auto;padding:28px 16px">'+content+'</main>'+modal;}
-function toast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}t.textContent=msg;t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:11px 26px;border-radius:24px;font-weight:600;font-size:14px;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,.4);border:1px solid rgba(230,57,70,.4);';t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity='0';},2500);}
-window.A={
-  goHome:function(){set({view:'home',currentBatch:null});},
-  goView:function(v){set({view:v});},
-  goBatch:function(id){var b=S.batches.find(function(b){return b.id===id;});if(!b)return;set({currentBatch:b,view:'batch'});loadBatchData(b);},
-  openModal:function(n){set({modal:n});},
-  closeModal:function(){set({modal:null,delTarget:null});},
-  askDel:function(type,id){if(type==='batch'){var b=S.batches.find(function(b){return b.id===id;});set({modal:'delBatch',delTarget:b});}else{var s=S.currentBatch.students.find(function(s){return s.id===id;});set({modal:'delStudent',delTarget:s});}},
-  confirmDel:function(type,id){if(type==='batch')delBatch(id);else delStudent(id);},
-  bfName:function(v){S.bf.name=v;},
-  bfTiming:function(v){S.bf.timing=v;},
-  bfPlace:function(v){S.bf.place=v;},
-  sfName:function(v){S.sf.name=v;},
-  sfMobile:function(v){S.sf.mobile=v;},
-  toggleDay:toggleDay,
-  submitBatch:function(){addBatch();},
-  submitStudent:function(){addStudent();},
-  markAttend:function(sid,st){var a=Object.assign({},S.attendance);a[sid]=st;set({attendance:a,attendSaved:false});},
-  markAll:function(st){var a={};(S.currentBatch.students||[]).forEach(function(s){a[s.id]=st;});set({attendance:a,attendSaved:false});},
-  loadDate:loadDate,
-  saveAttendance:saveAttendance,
-  toggleFee:function(sid,mi){toggleFee(sid,mi);}
-};
-render();boot();
+// ── Step 1: Dynamically load Firebase scripts in correct order ────────────────
+function loadScript(src, cb) {
+  var s = document.createElement('script');
+  s.src = src;
+  s.onload = cb;
+  s.onerror = function() {
+    document.getElementById('load-status').textContent = '❌ Failed to load Firebase. Check your internet connection.';
+  };
+  document.head.appendChild(s);
 }
+
+// Load Firebase App first, then Firestore, then start app
+loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function() {
+  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js', function() {
+    startApp(); // Only runs after BOTH scripts are loaded
+  });
+});
+
+// ── Step 2: Full app starts here ──────────────────────────────────────────────
+function startApp() {
+
+  // Init Firebase
+  var fbApp = firebase.initializeApp({
+    apiKey:            "AIzaSyAmC09RasLC5DX7ifI-8lMlgFwukfAGf4s",
+    authDomain:        "karate-dojo-8508d.firebaseapp.com",
+    projectId:         "karate-dojo-8508d",
+    storageBucket:     "karate-dojo-8508d.firebasestorage.app",
+    messagingSenderId: "385023110196",
+    appId:             "1:385023110196:web:477ffd69721b99ce62ae61"
+  });
+  var db = firebase.firestore();
+
+  // ── DB Helpers ──────────────────────────────────────────────────────────────
+  function dbGet(key) {
+    return db.collection('karate').doc(key).get().then(function(s) {
+      return s.exists ? s.data().value : null;
+    }).catch(function(e) { console.error('dbGet', e); return null; });
+  }
+  function dbSet(key, val) {
+    return db.collection('karate').doc(key).set({ value: val }).catch(function(e) { console.error('dbSet', e); });
+  }
+  function dbDel(key) {
+    return db.collection('karate').doc(key).delete().catch(function(e) { console.error('dbDel', e); });
+  }
+
+  // ── Constants ───────────────────────────────────────────────────────────────
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DAYS   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  var S = {
+    view:'home', batches:[], currentBatch:null, loading:true,
+    syncStatus:'synced', lastSync:null,
+    showAddBatch:false, showAddStudent:false,
+    delBatch:null, delStudent:null,
+    bf:{name:'',timing:'',days:[],place:''},
+    sf:{name:'',mobile:''},
+    attendDate: new Date().toISOString().slice(0,10),
+    attendance:{}, savedAttendance:{}, attendSaved:false,
+    fees:{}
+  };
+
+  function set(patch) { Object.assign(S, patch); render(); }
+
+  // ── Cloud ───────────────────────────────────────────────────────────────────
+  function cloud(key, val) {
+    set({syncStatus:'syncing'});
+    return dbSet(key, val).then(function() {
+      set({syncStatus:'synced', lastSync:new Date()});
+    });
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  function boot() {
+    dbGet('batches').then(function(data) {
+      set({batches: data||[], loading:false, lastSync:new Date()});
+    });
+    setInterval(function() {
+      dbGet('batches').then(function(data) {
+        if (!data) return;
+        if (JSON.stringify(S.batches) !== JSON.stringify(data)) {
+          var cb = S.currentBatch ? (data.find(function(b){return b.id===S.currentBatch.id;})||S.currentBatch) : null;
+          set({batches:data, currentBatch:cb, lastSync:new Date(), syncStatus:'synced'});
+        } else {
+          set({lastSync:new Date(), syncStatus:'synced'});
+        }
+      }).catch(function(){set({syncStatus:'error'});});
+    }, 15000);
+  }
+
+  function loadBatchData(batch) {
+    return Promise.all([
+      dbGet('att_'+batch.id),
+      dbGet('fee_'+batch.id)
+    ]).then(function(results) {
+      var a = results[0]||{}, f = results[1]||{};
+      var ex = a[S.attendDate];
+      var ai = {};
+      (batch.students||[]).forEach(function(s){ ai[s.id]='present'; });
+      set({savedAttendance:a, fees:f, attendance:ex||ai, attendSaved:!!ex});
+    });
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function addBatch() {
+    var f = S.bf;
+    if (!f.name.trim()) { toast('Batch name is required!'); return; }
+    var batch = {id:Date.now().toString(), name:f.name, timing:f.timing, days:f.days.slice(), place:f.place, students:[]};
+    var updated = S.batches.concat([batch]);
+    set({batches:updated, showAddBatch:false, bf:{name:'',timing:'',days:[],place:''}});
+    cloud('batches', updated);
+  }
+
+  function delBatch(id) {
+    var updated = S.batches.filter(function(b){return b.id!==id;});
+    var wasCurrent = S.currentBatch && S.currentBatch.id===id;
+    set({batches:updated, delBatch:null});
+    if (wasCurrent) set({view:'home', currentBatch:null});
+    cloud('batches', updated);
+    dbDel('att_'+id); dbDel('fee_'+id);
+  }
+
+  function addStudent() {
+    var f = S.sf;
+    if (!f.name.trim()) { toast('Name is required!'); return; }
+    if (!f.mobile.trim()) { toast('Mobile is required!'); return; }
+    var student = {id:Date.now().toString(), name:f.name, mobile:f.mobile};
+    var updated = merge(S.currentBatch, {students:(S.currentBatch.students||[]).concat([student])});
+    syncBatch(updated);
+    set({showAddStudent:false, sf:{name:'',mobile:''}});
+  }
+
+  function delStudent(sid) {
+    var updated = merge(S.currentBatch, {
+      students: S.currentBatch.students.filter(function(s){return s.id!==sid;})
+    });
+    syncBatch(updated);
+    set({delStudent:null});
+  }
+
+  function syncBatch(updated) {
+    var batches = S.batches.map(function(b){return b.id===updated.id?updated:b;});
+    set({currentBatch:updated, batches:batches});
+    cloud('batches', batches);
+  }
+
+  function saveAttendance() {
+    var updated = Object.assign({}, S.savedAttendance);
+    updated[S.attendDate] = Object.assign({}, S.attendance);
+    set({savedAttendance:updated, attendSaved:true});
+    cloud('att_'+S.currentBatch.id, updated);
+    toast('Attendance saved! ✅');
+  }
+
+  function toggleFee(sid, month) {
+    var key = sid+'_'+month;
+    var updated = Object.assign({}, S.fees);
+    updated[key] = !updated[key];
+    set({fees:updated});
+    cloud('fee_'+S.currentBatch.id, updated);
+  }
+
+  function merge(obj, patch) { return Object.assign({}, obj, patch); }
+
+  function toggleDay(day) {
+    var days = S.bf.days.indexOf(day) >= 0
+      ? S.bf.days.filter(function(d){return d!==day;})
+      : S.bf.days.concat([day]);
+    set({bf: merge(S.bf, {days:days})});
+  }
+
+  function loadDate(date) {
+    var ex = S.savedAttendance[date];
+    var ai = {};
+    ((S.currentBatch&&S.currentBatch.students)||[]).forEach(function(s){ai[s.id]='present';});
+    set({attendDate:date, attendance:ex||ai, attendSaved:!!ex});
+  }
+
+  function markAttend(sid, status) {
+    var a = Object.assign({}, S.attendance);
+    a[sid] = status;
+    set({attendance:a, attendSaved:false});
+  }
+
+  function markAll(status) {
+    var a = {};
+    (S.currentBatch.students||[]).forEach(function(s){a[s.id]=status;});
+    set({attendance:a, attendSaved:false});
+  }
+
+  // ── HTML Helpers ────────────────────────────────────────────────────────────
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function bdg(t,c) { return '<span style="background:'+(c||'#e63946')+';color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700">'+t+'</span>'; }
+
+  // ── View: Home ──────────────────────────────────────────────────────────────
+  function vHome() {
+    var ls = S.lastSync ? 'Last sync: '+S.lastSync.toLocaleTimeString() : '';
+    var cards;
+    if (S.batches.length === 0) {
+      cards = '<div style="background:rgba(255,255,255,.06);border-radius:16px;padding:60px 20px;text-align:center;border:1px solid rgba(255,255,255,.1)">'
+        + '<div style="font-size:56px;margin-bottom:12px">🥋</div>'
+        + '<p style="color:#aaa;font-size:16px;margin-bottom:16px">No batches yet. Create your first!</p>'
+        + '<button onclick="A.goAddBatch()" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:15px;font-weight:700;cursor:pointer">＋ Create Batch</button></div>';
+    } else {
+      cards = '<div class="bg" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">'
+        + S.batches.map(function(b) {
+            return '<div class="bc" onclick="A.goBatch(\''+b.id+'\')" style="background:rgba(255,255,255,.07);border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,.1);cursor:pointer;transition:transform .2s,box-shadow .2s">'
+              + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">'
+              + '<div><div style="color:#fff;font-weight:700;font-size:18px">'+esc(b.name)+'</div>'
+              + '<div style="color:#e63946;font-size:13px;margin-top:2px">'+esc(b.timing)+'</div></div>'
+              + '<button onclick="event.stopPropagation();A.askDelBatch(\''+b.id+'\')" style="background:rgba(230,57,70,.15);border:none;border-radius:8px;padding:7px;cursor:pointer;font-size:15px">🗑</button></div>'
+              + '<div style="color:#bbb;font-size:13px">📍 '+esc(b.place||'—')+'</div>'
+              + '<div style="color:#bbb;font-size:13px;margin-top:4px">📅 '+esc((b.days||[]).join(', ')||'—')+'</div>'
+              + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">'
+              + bdg((b.students?b.students.length:0)+' Students','#0f3460')
+              + '<span style="color:#e63946;font-size:13px;font-weight:600">Open →</span></div></div>';
+          }).join('') + '</div>';
+    }
+    return '<div style="background:rgba(14,165,233,.15);border:1px solid rgba(14,165,233,.3);border-radius:12px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + '<span style="font-size:20px">☁️</span>'
+      + '<div style="flex:1;min-width:180px"><div style="color:#7dd3fc;font-weight:700;font-size:14px">Firebase Cloud — Shared by everyone</div>'
+      + '<div style="color:#94a3b8;font-size:12px">Data saved to Firebase. Anyone opening this link sees the same data.</div></div>'
+      + '<div style="color:#64748b;font-size:11px">'+ls+'</div></div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">'
+      + '<div><h2 style="color:#fff;margin:0;font-size:26px">Training Batches</h2>'
+      + '<p style="color:#aaa;margin:4px 0 0">'+S.batches.length+' active batch'+(S.batches.length!==1?'es':'')+'</p></div>'
+      + '<button onclick="A.goAddBatch()" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:15px;font-weight:700;cursor:pointer">＋ Add Batch</button></div>'
+      + cards;
+  }
+
+  // ── View: Batch ─────────────────────────────────────────────────────────────
+  function vBatch() {
+    var b = S.currentBatch;
+    return '<div style="margin-bottom:24px"><h2 style="color:#fff;margin:0;font-size:24px">'+esc(b.name)+'</h2>'
+      + '<div style="color:#aaa;font-size:14px;margin-top:4px">⏰ '+esc(b.timing)+' &nbsp;|&nbsp; 📍 '+esc(b.place)+' &nbsp;|&nbsp; 📅 '+esc((b.days||[]).join(', '))+'</div></div>'
+      + '<div class="ng" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">'
+      + [{l:'Students',i:'👥',s:(b.students?b.students.length:0)+' enrolled',v:'students',c:'#0f3460'},
+         {l:'Attendance',i:'📋',s:'Mark & track',v:'attendance',c:'#2d6a4f'},
+         {l:'Fees',i:'💰',s:'Monthly tracking',v:'fees',c:'#7b2d8b'}].map(function(item) {
+        return '<div class="nc" onclick="A.goView(\''+item.v+'\')" style="background:linear-gradient(135deg,'+item.c+',rgba(255,255,255,.05));border-radius:16px;padding:28px;cursor:pointer;border:1px solid rgba(255,255,255,.12);text-align:center;transition:transform .2s">'
+          + '<div style="font-size:38px">'+item.i+'</div>'
+          + '<div style="color:#fff;font-weight:700;font-size:18px;margin-top:10px">'+item.l+'</div>'
+          + '<div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px">'+item.s+'</div></div>';
+      }).join('') + '</div>';
+  }
+
+  // ── View: Students ──────────────────────────────────────────────────────────
+  function vStudents() {
+    var b = S.currentBatch;
+    var rows = (!b.students||b.students.length===0)
+      ? '<div style="background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1)"><div style="font-size:44px">🥋</div><p style="color:#888;margin-top:12px">No students yet.</p></div>'
+      : b.students.map(function(s,i) {
+          return '<div class="fade" style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
+            + '<div style="display:flex;align-items:center;gap:14px">'
+            + '<div style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">'+(i+1)+'</div>'
+            + '<div><div style="font-weight:700;font-size:16px;color:#1a1a2e">'+esc(s.name)+'</div>'
+            + '<div style="color:#888;font-size:13px">📱 '+esc(s.mobile)+'</div></div></div>'
+            + '<button onclick="A.askDelStudent(\''+s.id+'\')" style="background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">🗑 Remove</button></div>';
+        }).join('');
+    return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">'
+      + '<h2 style="color:#fff;margin:0">👥 Students — '+esc(b.name)+'</h2>'
+      + '<button onclick="A.goAddStudent()" style="background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:15px;font-weight:700;cursor:pointer">＋ Add Student</button></div>'
+      + '<div style="display:flex;flex-direction:column;gap:12px">'+rows+'</div>';
+  }
+
+  // ── View: Attendance ────────────────────────────────────────────────────────
+  function vAttendance() {
+    var b = S.currentBatch;
+    var noS = !b.students||b.students.length===0;
+    var rows = noS ? '<p style="color:#888;text-align:center;padding:20px">No students in this batch.</p>'
+      : b.students.map(function(s) {
+          var st = S.attendance[s.id]||'present';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:10px;'
+            + 'background:'+(st==='present'?'rgba(45,106,79,.1)':'rgba(230,57,70,.08)')+';'
+            + 'border:1.5px solid '+(st==='present'?'#2d6a4f':'#e63946')+';flex-wrap:wrap;gap:8px">'
+            + '<span style="font-weight:600;color:#1a1a2e">'+esc(s.name)+'</span>'
+            + '<div style="display:flex;gap:8px">'
+            + '<button onclick="A.markAttend(\''+s.id+'\',\'present\')" style="background:'+(st==='present'?'#2d6a4f':'#f0f0f0')+';color:'+(st==='present'?'#fff':'#555')+';border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:13px">✅ Present</button>'
+            + '<button onclick="A.markAttend(\''+s.id+'\',\'absent\')" style="background:'+(st==='absent'?'#e63946':'#f0f0f0')+';color:'+(st==='absent'?'#fff':'#555')+';border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:13px">❌ Absent</button>'
+            + '</div></div>';
+        }).join('');
+    var recs = '';
+    if (Object.keys(S.savedAttendance).length > 0) {
+      recs = '<div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:24px;margin-top:20px">'
+        + '<h3 style="margin:0 0 14px;color:#1a1a2e">📅 Past Attendance Records</h3>'
+        + '<div style="display:flex;flex-direction:column;gap:8px">'
+        + Object.keys(S.savedAttendance).sort(function(a,b){return b.localeCompare(a);}).map(function(dt) {
+            var rec = S.savedAttendance[dt];
+            var tot = Object.keys(rec).length;
+            var pr = Object.keys(rec).filter(function(k){return rec[k]==='present';}).length;
+            return '<div onclick="A.loadDate(\''+dt+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;background:#f8f8f8;cursor:pointer;border:1px solid #e0e0e0;flex-wrap:wrap;gap:6px">'
+              + '<span style="font-weight:600">'+dt+'</span>'
+              + '<div style="display:flex;gap:8px">'+bdg(pr+' Present','#2d6a4f')+bdg((tot-pr)+' Absent','#e63946')+'</div></div>';
+          }).join('') + '</div></div>';
+    }
+    return '<h2 style="color:#fff;margin:0 0 20px">📋 Attendance — '+esc(b.name)+'</h2>'
+      + '<div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:24px">'
+      + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:20px">'
+      + '<div style="flex:1;min-width:200px"><label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:4px">Select Date</label>'
+      + '<input type="date" id="att-date" value="'+S.attendDate+'" onchange="A.loadDate(this.value)" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;width:100%;outline:none"/></div>'
+      + (S.attendSaved ? bdg('✓ Saved','#2d6a4f') : '') + '</div>'
+      + (!noS ? '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
+          + '<button onclick="A.markAll(\'present\')" style="background:#f1f1f1;color:#333;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">✅ Mark All Present</button>'
+          + '<button onclick="A.markAll(\'absent\')" style="background:#f1f1f1;color:#333;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">❌ Mark All Absent</button></div>' : '')
+      + '<div style="display:flex;flex-direction:column;gap:10px">'+rows+'</div>'
+      + (!noS ? '<button onclick="A.saveAttendance()" style="margin-top:20px;width:100%;padding:12px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">💾 Save Attendance for '+S.attendDate+'</button>' : '')
+      + '</div>' + recs;
+  }
+
+  // ── View: Fees ──────────────────────────────────────────────────────────────
+  function vFees() {
+    var b = S.currentBatch;
+    if (!b.students||b.students.length===0)
+      return '<h2 style="color:#fff;margin:0 0 20px">💰 Fees — '+esc(b.name)+'</h2>'
+        + '<div style="background:#fff;border-radius:16px;padding:40px;text-align:center"><p style="color:#888">No students in this batch.</p></div>';
+    return '<h2 style="color:#fff;margin:0 0 20px">💰 Fees — '+esc(b.name)+'</h2>'
+      + '<div style="display:flex;flex-direction:column;gap:20px">'
+      + b.students.map(function(s) {
+          var pc = MONTHS.filter(function(m){return S.fees[s.id+'_'+m];}).length;
+          var bc = pc===12?'#2d6a4f':pc>0?'#e07c00':'#e63946';
+          return '<div class="fade" style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);padding:24px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+            + '<div><div style="font-weight:700;font-size:16px;color:#1a1a2e">'+esc(s.name)+'</div>'
+            + '<div style="color:#888;font-size:13px">📱 '+esc(s.mobile)+'</div></div>'
+            + bdg(pc+'/12 Paid',bc) + '</div>'
+            + '<div class="mg" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:8px">'
+            + MONTHS.map(function(m) {
+                var paid = !!S.fees[s.id+'_'+m];
+                return '<button class="mb" onclick="A.toggleFee(\''+s.id+'\',\''+m+'\')" style="padding:8px 6px;border-radius:8px;border:2px solid '+(paid?'#2d6a4f':'#e0e0e0')+';background:'+(paid?'rgba(45,106,79,.12)':'#fafafa')+';cursor:pointer;font-weight:600;font-size:12px;color:'+(paid?'#2d6a4f':'#888')+';transition:all .15s">'+(paid?'✅':'⬜')+' '+m.slice(0,3)+'</button>';
+              }).join('') + '</div></div>';
+        }).join('') + '</div>';
+  }
+
+  // ── Modals ──────────────────────────────────────────────────────────────────
+  function mkModal(title, body) {
+    return '<div id="mbg" onclick="if(event.target.id===\'mbg\')A.closeModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">'
+      + '<div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
+      + '<h3 style="margin:0;font-size:20px;color:#1a1a2e">'+title+'</h3>'
+      + '<button onclick="A.closeModal()" style="background:none;border:none;cursor:pointer;font-size:22px;color:#888">✕</button></div>'
+      + body + '</div></div>';
+  }
+
+  function mAddBatch() {
+    var f = S.bf;
+    return mkModal('🥋 Add New Batch',
+      '<div style="display:flex;flex-direction:column;gap:14px">'
+      + '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:13px;font-weight:600;color:#555">Batch Name *</label><input id="bf-name" placeholder="e.g. Morning Beginners" value="'+esc(f.name)+'" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none"/></div>'
+      + '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:13px;font-weight:600;color:#555">Timing</label><input id="bf-timing" placeholder="e.g. 7:00 AM – 8:00 AM" value="'+esc(f.timing)+'" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none"/></div>'
+      + '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:13px;font-weight:600;color:#555">Place</label><input id="bf-place" placeholder="e.g. Main Dojo Hall" value="'+esc(f.place)+'" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none"/></div>'
+      + '<div><label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:8px">Training Days</label>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+      + DAYS.map(function(d) {
+          var sel = S.bf.days.indexOf(d)>=0;
+          return '<button onclick="A.toggleDay(\''+d+'\')" style="padding:6px 14px;border-radius:20px;border:2px solid '+(sel?'#e63946':'#e0e0e0')+';background:'+(sel?'rgba(230,57,70,.1)':'#fff')+';cursor:pointer;font-weight:600;font-size:13px;color:'+(sel?'#e63946':'#888')+';transition:all .15s">'+d+'</button>';
+        }).join('') + '</div></div>'
+      + '<div style="display:flex;gap:10px;margin-top:8px">'
+      + '<button onclick="A.submitBatch()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;font-size:15px">Create Batch</button>'
+      + '<button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:#f1f1f1;color:#333;font-size:15px">Cancel</button>'
+      + '</div></div>');
+  }
+
+  function mAddStudent() {
+    return mkModal('👤 Add Student',
+      '<div style="display:flex;flex-direction:column;gap:14px">'
+      + '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:13px;font-weight:600;color:#555">Full Name *</label><input id="sf-name" placeholder="Student name" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none"/></div>'
+      + '<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:13px;font-weight:600;color:#555">Mobile Number *</label><input id="sf-mobile" placeholder="10-digit number" style="border:1.5px solid #e0e0e0;border-radius:8px;padding:9px 14px;font-size:14px;outline:none"/></div>'
+      + '<div style="display:flex;gap:10px;margin-top:8px">'
+      + '<button onclick="A.submitStudent()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:linear-gradient(135deg,#e63946,#c1121f);color:#fff;font-size:15px">Add Student</button>'
+      + '<button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:#f1f1f1;color:#333;font-size:15px">Cancel</button>'
+      + '</div></div>');
+  }
+
+  function mDelBatch() {
+    var b = S.delBatch;
+    return mkModal('⚠️ Delete Batch',
+      '<p style="color:#555;margin-bottom:20px">Delete <strong>'+esc(b.name)+'</strong>? All data will be removed.</p>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button onclick="A.confirmDelBatch(\''+b.id+'\')" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;font-size:15px">Yes, Delete</button>'
+      + '<button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:#f1f1f1;color:#333;font-size:15px">Cancel</button></div>');
+  }
+
+  function mDelStudent() {
+    var s = S.delStudent;
+    return mkModal('⚠️ Remove Student',
+      '<p style="color:#555;margin-bottom:20px">Remove <strong>'+esc(s.name)+'</strong> from this batch?</p>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button onclick="A.confirmDelStudent(\''+s.id+'\')" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:linear-gradient(135deg,#e63946,#9d0208);color:#fff;font-size:15px">Yes, Remove</button>'
+      + '<button onclick="A.closeModal()" style="flex:1;border:none;border-radius:8px;cursor:pointer;font-weight:700;padding:10px;background:#f1f1f1;color:#333;font-size:15px">Cancel</button></div>');
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  function render() {
+    var root = document.getElementById('root');
+    if (!root) return;
+    if (S.loading) {
+      root.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:24px;color:#e63946">Loading... 🥋</div>';
+      return;
+    }
+    var si = S.syncStatus==='synced'?'☁️':S.syncStatus==='syncing'?'🔄':'⚠️';
+    var sl = S.syncStatus==='synced'?'Cloud Synced':S.syncStatus==='syncing'?'Saving...':'Sync Error';
+    var sc = S.syncStatus==='error'?'#ff6b6b':'#aef';
+    var isHome = S.view==='home';
+    var backFn = S.view==='batch' ? 'A.goHome()' : "A.goView('batch')";
+    var content = '';
+    if (S.view==='home')       content = vHome();
+    else if (S.view==='batch') content = vBatch();
+    else if (S.view==='students')   content = vStudents();
+    else if (S.view==='attendance') content = vAttendance();
+    else if (S.view==='fees')       content = vFees();
+    var modal = '';
+    if (S.showAddBatch)   modal = mAddBatch();
+    else if (S.showAddStudent) modal = mAddStudent();
+    else if (S.delBatch)   modal = mDelBatch();
+    else if (S.delStudent) modal = mDelStudent();
+    root.innerHTML =
+      '<header style="background:rgba(0,0,0,.35);backdrop-filter:blur(10px);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:100">'
+      + '<div style="display:flex;align-items:center;gap:12px">'
+      + (!isHome ? '<button onclick="'+backFn+'" style="background:none;border:none;cursor:pointer;color:#e63946;padding:4px 8px;font-size:22px">←</button>' : '')
+      + '<span style="font-size:28px">🥋</span>'
+      + '<div><div style="color:#fff;font-weight:800;font-size:20px;letter-spacing:1px">KARATE DOJO</div>'
+      + '<div style="color:#e63946;font-size:11px;font-weight:600;letter-spacing:2px">MANAGEMENT SYSTEM</div></div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + (!isHome&&S.currentBatch ? bdg(esc(S.currentBatch.name)) : '')
+      + '<div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border-radius:20px;padding:5px 12px">'
+      + '<span>'+si+'</span><span style="color:'+sc+';font-size:11px;font-weight:600"> '+sl+'</span></div></div></header>'
+      + '<main class="fade" style="max-width:960px;margin:0 auto;padding:28px 16px">'+content+'</main>'
+      + modal;
+  }
+
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    if (!t) { t = document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 24px;border-radius:24px;font-weight:600;font-size:14px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid rgba(230,57,70,.4);';
+    t.style.opacity = '1';
+    clearTimeout(t._t);
+    t._t = setTimeout(function(){ t.style.opacity='0'; }, 2500);
+  }
+
+  // ── Expose to window as A (App) ─────────────────────────────────────────────
+  window.A = {
+    goHome:    function(){ set({view:'home',currentBatch:null}); },
+    goView:    function(v){ set({view:v}); },
+    goBatch:   function(id){ var b=S.batches.find(function(b){return b.id===id;}); if(!b)return; set({currentBatch:b,view:'batch'}); loadBatchData(b); },
+    goAddBatch:    function(){ set({showAddBatch:true}); },
+    goAddStudent:  function(){ set({showAddStudent:true}); },
+    closeModal:    function(){ set({showAddBatch:false,showAddStudent:false,delBatch:null,delStudent:null}); },
+    askDelBatch:   function(id){ set({delBatch:S.batches.find(function(b){return b.id===id;})}); },
+    askDelStudent: function(id){ set({delStudent:S.currentBatch.students.find(function(s){return s.id===id;})}); },
+    confirmDelBatch:   function(id){ delBatch(id); },
+    confirmDelStudent: function(id){ delStudent(id); },
+    toggleDay: toggleDay,
+    submitBatch: function(){
+      set({bf: merge(S.bf, {
+        name:   (document.getElementById('bf-name')||{}).value||'',
+        timing: (document.getElementById('bf-timing')||{}).value||'',
+        place:  (document.getElementById('bf-place')||{}).value||''
+      })});
+      addBatch();
+    },
+    submitStudent: function(){
+      set({sf:{
+        name:   (document.getElementById('sf-name')||{}).value||'',
+        mobile: (document.getElementById('sf-mobile')||{}).value||''
+      }});
+      addStudent();
+    },
+    markAttend:    function(sid,st){ markAttend(sid,st); },
+    markAll:       function(st){ markAll(st); },
+    loadDate:      function(d){ loadDate(d); },
+    saveAttendance: saveAttendance,
+    toggleFee:     function(sid,m){ toggleFee(sid,m); },
+  };
+
+  // ── Start ───────────────────────────────────────────────────────────────────
+  render();
+  boot();
+
+} // end startApp()
 </script>
 </body>
 </html>
